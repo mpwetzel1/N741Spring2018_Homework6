@@ -1,9 +1,11 @@
 ---
 title: "N741 Spring 2018 - Homework 6"
-subtitle:  "Homework 6 - DUE FRIDAY April 6, 2018"
 author: "Martha Wetzel"
 date: "April 4, 2018"
-output: html_document
+output:
+  word_document: default
+  html_document: default
+subtitle: Homework 6 - DUE FRIDAY April 6, 2018
 ---
 
 ```{r setup, include=FALSE}
@@ -37,14 +39,14 @@ See complete data descriptions and codebook at [https://melindahiggins2000.githu
 
 For Homework 6, you will focus only on these variables from the HELP dataset:
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r, message=FALSE, warning=FALSE}
 library(tidyverse)
 library(haven)
 library(stargazer)
 library(car)
 helpdata <- haven::read_spss("helpmkh.sav")
 
-sub1 <- helpdata %>%
+h1 <- helpdata %>%
   select(age, female, pss_fr, homeless, 
          pcs, mcs, cesd)
 
@@ -54,7 +56,7 @@ getlabel <- function(x) attributes(x)$label
 # getlabel(sub1$age)
 
 library(purrr)
-ldf <- purrr::map_df(sub1, getlabel) # this is a 1x15 tibble data.frame
+ldf <- purrr::map_df(h1, getlabel) # this is a 1x15 tibble data.frame
 # t(ldf) # transpose for easier reading to a 15x1 single column list
 
 # using knitr to get a table of these
@@ -63,6 +65,18 @@ library(knitr)
 knitr::kable(t(ldf),
              col.names = c("Variable Label"),
              caption="Use these variables from HELP dataset for Homework 06")
+
+# add dichotomous variable
+# to indicate depression for
+# people with CESD scores >= 16
+
+h1 <- h1 %>%
+  mutate(cesd_gte16 = cesd >= 16)
+
+# change cesd_gte16 LOGIC variable type
+# to numeric coded 1=TRUE and 0=FALSE
+
+h1$cesd_gte16 <- as.numeric(h1$cesd_gte16)
 
 ```
 
@@ -164,18 +178,70 @@ exp(coef(cesdlr1))
 
 ```
 
-A one point increase in MCS score is associated with a decrease in the odds of meeting the criteria for depression of 0.84.
+A one point increase in MCS score is associated with a 16% decrease in the odds of meeting the criteria for depression.
+
+### Question 8
 
 8. Use the `predict()` function like we did in class to predict CESD => 16 and compare it back to the original data. For now, use a cutoff probability of 0.5 - if the probability is > 0.5 consider this to be true and false otherwise. Like we did in class. **REMEMBER** See the R code for the class example at [https://github.com/melindahiggins2000/N741_lecture11_27March2018/blob/master/lesson11_logreg_Rcode.R](https://github.com/melindahiggins2000/N741_lecture11_27March2018/blob/master/lesson11_logreg_Rcode.R)
     + How well did the model correctly predict CESD scores => 16 (indicating depression)? (make the "confusion matrix" and look at the true positives and true negatives versus the false positives and false negatives).
     
+```{r}
+
+cesdpred <- predict(cesdlr1, newdata=h1,
+                      type="response")
+
+table(h1$cesd_gte16, cesdpred > 0.5)
+
+
+t1 <- table(cesdpred > 0.5, h1$cesd_gte16)
+t1 # this shows homeless as the 0/1, and then model predictions are TRUE/FALSE. This shows false negatives and false positives.
+
+tpr <- t1[2,2]/(t1[2,2]+t1[1,2]) # true positive rate
+tpr #senstivity
+tnr <- t1[1,1]/(t1[1,1]+t1[2,1]) # true negative rate
+tnr #specificity
+
+
+```
+    
+The sensitivity, or true positive rate, is very high at 97 percent. The specificity, or true negative rate, is 48 percent.    
+    
+### Question 9
 9. Make an ROC curve plot and compute the AUC and explain if this is a good model for predicting depression or not
 
+```{r}
+
+library(ROCR)
+
+# Make the ROC curve plot
+pr <- prediction(cesdpred, as.numeric(h1$cesd_gte16)) # this is a function to create "prediction objects" which must be in a standardized format
+prf <- performance(pr, measure = "tpr", x.measure = "fpr") #tpr is true positive rate, fpr is false positive rate
+plot(prf)
+abline(a=0, b=1, col="red")
+
+# Calculate AUC
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+
+
+```
+
+The AUC is  `r round(auc,3)`. This is a good model for predicting depression because the AUC is over 0.9.
+
+### Question 10
 10. Make a plot showing the probability curve - put the `mcs` values on the X-axis and the probability of depression on the Y-axis. Based on this plot, do you think the `mcs` is a good predictor of depression? [**FYI** This plot is also called an "effect plot" is you're using `Rcmdr` to do these analyses.]
+
+```{r}
+
+plot(h1$mcs, cesdpred)
+
+```
+
+This plot shows that there is a high predicted probability of depression when mental health scores are low and a lower probability of depression as mental health scores improve. This makes intuitive sense.
 
 ---
 
-**Use R markdown to complete your homework and show all of your code and output in your final report - Turn in a PDF of your report to Canvas. Include a link to your Github repo for Homework 6**
+This code can be found on [Github](https://github.com/mpwetzel1/N741Spring2018_Homework6.git)
 
 ---
 
